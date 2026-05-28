@@ -1,94 +1,55 @@
-# QR Bot — Handoff
+# Handoff: QR Bot — UX fixes and README update
 
-## Context
-Telegram bot for generating custom QR codes. Multi-step ConversationHandler: color → logo (optional) → text → generate + send.
-
-Repo: https://github.com/mxrkiz/QR-generation-bot-for-Telegram-messenger
-
-## Fixes needed (priority order)
-
-### 1. `handle_new_start` — antipattern (HIGH)
-**File:** `handlers.py`, function `handle_new_start`
-
-Currently sends the literal text `"/start"` as a message to the chat — this is a hack.
-Replace with a direct call to `start_custom_qr`:
-
-```python
-async def handle_new_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    await query.edit_message_text("Resetting flow...", reply_markup=None)
-    return await start_custom_qr(update, context)
-```
-
-Also remove the now-unused persistent handler in `main.py`:
-```python
-# DELETE this block:
-application.add_handler(
-    CallbackQueryHandler(handle_new_start, pattern=f"^{re.escape(START_QR_CALLBACK_DATA)}$")
-)
-```
-Wire `START_QR_CALLBACK_DATA` into ConversationHandler entry_points instead.
+**Date:** 29.05.2026
+**Context:** Fixed three UX bugs in the Telegram QR bot; README update not yet done
+**Status:** In progress — README update pending (last user request)
 
 ---
 
-### 2. `box_size=100` generates oversized images (HIGH)
-**File:** `handlers.py`, function `create_custom_qr`
+## Summary
 
-`box_size=100` produces ~3000×3000 px images. Change to `box_size=10`:
+Three issues were fixed this session: typing "Start New QR" manually did not restart the conversation flow, the logo step had no inline Skip button, and PTB emitted a `UserWarning` about `per_message`. The user's final request was to document the changes in README — that has not been done yet.
 
-```python
-qr = qrcode.QRCode(
-    error_correction=qrcode.constants.ERROR_CORRECT_H,
-    box_size=10,  # was 100
-    border=3,
-)
-```
+## What we did
 
----
+1. **Fix "Start New QR" typed manually** — in `handle_restart_prompt`, added a branch: if the message text matches `RESTART_BUTTON_TEXT`, call `start_custom_qr` directly instead of silently returning.
+2. **"Skip →" inline button on the logo step:**
+   - `config.py` — added `SKIP_LOGO_DATA = "SKIP_LOGO"` and `LOGO_STEP_KEYBOARD` (two inline buttons in one row: ⬅️ Go Back + Skip →)
+   - `handlers.py` — added `skip_logo_callback` to handle the inline button; `prompt_for_logo` and the `go_back` branch for GET_LOGO now use `LOGO_STEP_KEYBOARD` instead of `INLINE_BACK_KEYBOARD`; error replies in `get_logo_and_prompt_text` also use `LOGO_STEP_KEYBOARD`
+   - `main.py` — registered `CallbackQueryHandler(skip_logo_callback, pattern=SKIP_LOGO_DATA)` in the `GET_LOGO` state
+3. **Suppress PTBUserWarning** — added `per_message=False` explicitly to `ConversationHandler` and `warnings.filterwarnings("ignore", category=UserWarning, message=".*per_message=False.*")` at module level in `main.py`
 
-### 3. `go_back` duplicates the color keyboard (MEDIUM)
-**File:** `handlers.py`, function `go_back`, branch `if current_state == GET_LOGO`
+## Current state
 
-Keyboard is rebuilt manually instead of using `COLOR_REPLY_MARKUP` from `config.py`.
-Replace local construction with:
+Files modified this session:
+- `c:\Users\marki\.vscode\Coding\QR-bot-Telegram\main.py` — `per_message=False`, `warnings.filterwarnings`, imports `SKIP_LOGO_DATA` and `skip_logo_callback`, new handler in GET_LOGO state
+- `c:\Users\marki\.vscode\Coding\QR-bot-Telegram\handlers.py` — `skip_logo_callback`, `LOGO_STEP_KEYBOARD` in relevant places, fix in `handle_restart_prompt`
+- `c:\Users\marki\.vscode\Coding\QR-bot-Telegram\config.py` — `SKIP_LOGO_DATA`, `LOGO_STEP_KEYBOARD`
 
-```python
-await query.message.reply_text("Color menu:", reply_markup=COLOR_REPLY_MARKUP)
-```
+Not changed:
+- `README.md` — contains an unresolved git merge conflict (`<<<<<<< HEAD` / `>>>>>>>`); no update has been made
 
----
+Not tested live — changes verified by code analysis only.
 
-### 4. Pin versions in `requirements.txt` (MEDIUM)
-No versions pinned — breaks on fresh installs (PTB v13 vs v20 are incompatible).
-Run `pip freeze` in the venv, lock exact versions. Also remove `numpy` — unused in the codebase.
+## Blockers / open questions
 
----
+- `README.md` has an unresolved git merge conflict — must be fixed before adding new content
+- Unclear whether the user wants a Changelog section or an update to the existing Features section
 
-### 5. Add `.gitignore` (LOW)
-```
-__pycache__/
-*.pyc
-.env
-```
+## Next steps
 
----
+1. Resolve the merge conflict in `README.md` (remove conflict markers, keep HEAD content as authoritative)
+2. Add a description of new features: "Skip →" inline button on the logo step; manual "Start New QR" text now works
+3. Run the bot and verify all three fixes live
 
-### 6. Add run instructions to `README.md` (LOW)
-Add a Setup section:
-```
-git clone <repo>
-cd QR-generation-bot-for-Telegram-messenger
-pip install -r requirements.txt
-# Set TELEGRAM_TOKEN in config.py or via .env
-python main.py
-```
+## Assumptions
 
----
+- `LOGO_STEP_KEYBOARD` is intentionally only used on the GET_LOGO step; GET_TEXT still uses `INLINE_BACK_KEYBOARD` with a single Back button
+- The `/skip` command remains functional alongside the inline button
 
-## Do not change
-- Module structure — clean separation is correct
-- `ImageDocumentFilter` — correct implementation
-- `ERROR_CORRECT_H` — required for logo embedding, do not downgrade
-- `TELEGRAM_TOKEN = "BOT_TOKEN"` placeholder — token is not leaked
-- README screenshots
+## Key context for continuation
+
+- **Environment:** Windows 11, Python 3.14, python-telegram-bot 22.7
+- **Files to re-read first:** `config.py`, `handlers.py`, `main.py`, `README.md`
+- **README merge conflict:** between HEAD (has Setup section) and commit `eaa020b` (does not) — take HEAD as the correct version
+- **PTB warning suppression:** done via `warnings.filterwarnings` on message text rather than importing `PTBUserWarning` — pyright cannot statically resolve `telegram.warnings`, so a direct import would show as an error

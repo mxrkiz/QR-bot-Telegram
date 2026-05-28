@@ -10,7 +10,12 @@
       "Bash(python -c \"import dotenv; print\\(dotenv.__version__\\)\")",
       "Bash(claude mcp *)",
       "Bash(python -m json.tool)",
-      "Read(//c/Users/marki/.claude/**)"
+      "Read(//c/Users/marki/.claude/**)",
+      "Bash(pip install *)",
+      "Bash(python -c \"import telegram; print\\('OK:', telegram.__version__\\)\")",
+      "Bash(python -c \"from config import TELEGRAM_TOKEN; print\\('config OK'\\)\")",
+      "Bash(python -c \"from filters import IMAGE_FILE_FILTER; print\\('filters OK'\\)\")",
+      "Bash(python -c \"import main; print\\('main OK'\\)\")"
     ]
   }
 }
